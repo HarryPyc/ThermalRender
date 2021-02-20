@@ -13,5 +13,5 @@ inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort =
 	}
 }
 
-void initRender();
+void initRender(int w, int h);
 void render(unsigned int* d_pbo, int w, int h);

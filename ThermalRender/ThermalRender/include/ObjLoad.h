@@ -24,7 +24,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
 #ifndef OBJLOAD_H_
 #define OBJLOAD_H_
-#define MAX 1e4f
+#define MAX 1e5f
 #include <algorithm>
 #include <fstream>
 #include <iostream>
@@ -41,7 +41,8 @@ namespace obj {
         std::vector<float> vertex; //< 3 * N entries
         std::vector<float> texCoord; //< 2 * N entries
         std::vector<float> normal; //< 3 * N entries
-        float min[3], max[3];
+        
+        std::map<std::string, std::vector<float>> AABB;
         std::map<std::string, std::vector<unsigned int> > faces; //< assume triangels and uniform indexing
     };
 
@@ -61,6 +62,7 @@ namespace obj {
         std::vector<float> normal; //< 3 * N entries
 
         std::map<std::string, FaceList > faces;
+        std::map<std::string, std::vector<float>> AABB;
     };
 
     inline ObjModel parseObjModel(std::istream& in);
@@ -131,6 +133,7 @@ namespace obj {
         groups.insert("default");
 
         ObjModel data;
+        std::string curGroup;
 
         while (in.good()) {
             in.getline(line, 1023);
@@ -142,8 +145,9 @@ namespace obj {
             if (op == "v") {
                 for (int i = 0; i < 3; i++) {
                     line_in >> data.vertex;
-                    data.min[i] = fmin(data.min[i], *(data.vertex.cend()-1));
-                    data.max[i] = fmax(data.max[i], *(data.vertex.cend() - 1));
+                    const float val = data.vertex.back();
+                    data.AABB[curGroup][i] = fmin(data.AABB[curGroup][i], val);
+                    data.AABB[curGroup][i + 3] = fmax(data.AABB[curGroup][i + 3], val);
                 }
             }
             else if (op == "vt")
@@ -153,6 +157,9 @@ namespace obj {
             else if (op == "g") {
                 groups.clear();
                 while (line_in >> groups);
+                std::vector<float> aabb{ MAX, MAX, MAX, -MAX, -MAX, -MAX };
+                curGroup = *groups.begin();
+                data.AABB[curGroup] = aabb;
                 groups.insert("default");
             }
             else if (op == "f") {
@@ -237,8 +244,8 @@ namespace obj {
                 v.push_back(index);
             }
         }
-        memcpy(model.min, obj.min, sizeof(obj.min));
-        memcpy(model.max, obj.max, sizeof(obj.max));
+        
+        model.AABB = obj.AABB;
         return model;
     }
 
