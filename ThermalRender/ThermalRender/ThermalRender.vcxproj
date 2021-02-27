@@ -89,6 +89,7 @@
     <ClCompile Include="Mesh.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Camera.cuh" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Render.cuh" />
   </ItemGroup>

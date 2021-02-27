@@ -8,6 +8,7 @@ GLFWwindow* window;
 const int WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720;
 GLuint pbo, textureID;
 cudaGraphicsResource_t pboCuda;
+int Samples = 0;
 
 void printGlInfo()
 {
@@ -42,18 +43,20 @@ void initOpenGL() {
 
 	glGenBuffers(1, &pbo);
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
-	glBufferData(GL_PIXEL_UNPACK_BUFFER, WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(unsigned int), 0, GL_DYNAMIC_COPY);
+	glBufferData(GL_PIXEL_UNPACK_BUFFER, WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(float) * 4, 0, GL_DYNAMIC_COPY);
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
 	glGenTextures(1, &textureID);
 	glBindTexture(GL_TEXTURE_2D, textureID);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, WINDOW_WIDTH, WINDOW_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, WINDOW_WIDTH, WINDOW_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	gpuErrchk(cudaGraphicsGLRegisterBuffer(&pboCuda, pbo, cudaGraphicsRegisterFlagsNone));
+
+	glEnable(GL_FRAMEBUFFER_SRGB);//Gamma Correction
 }
 
 void DrawTexture() {
@@ -63,7 +66,7 @@ void DrawTexture() {
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
 	glBindTexture(GL_TEXTURE_2D, textureID);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT,
-		GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		GL_RGBA, GL_FLOAT, NULL);
 
 	glBegin(GL_QUADS);
 	glTexCoord2f(0.0f, 0.0f); glVertex3f(-1.0f, -1.0f, 0.0f);
@@ -78,11 +81,11 @@ void DrawTexture() {
 void DrawPBO() {
 	gpuErrchk(cudaGraphicsMapResources(1, &pboCuda));
 
-	unsigned int* d_pbo;
-	size_t numBytes = WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(unsigned int);
+	float* d_pbo;
+	size_t numBytes = WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(float) * 4;
 	gpuErrchk(cudaGraphicsResourceGetMappedPointer((void**)&d_pbo, &numBytes, pboCuda));
 
-	render(d_pbo, WINDOW_WIDTH, WINDOW_HEIGHT);
+	render(d_pbo, WINDOW_WIDTH, WINDOW_HEIGHT, Samples);
 
 	gpuErrchk(cudaGraphicsUnmapResources(1, &pboCuda));
 }

@@ -17,6 +17,7 @@
   <ItemGroup>
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Render.cuh" />
+    <ClInclude Include="Camera.cuh" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Render.cu" />

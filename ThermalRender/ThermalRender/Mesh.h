@@ -2,16 +2,29 @@
 #define GLM_FORCE_CUDA
 #include <glm/glm.hpp>
 
-
 struct Object {
-	unsigned int  color;
-	glm::vec3 minAABB, maxAABB;
+	glm::vec3 color;
+	unsigned int N;//index count
+	glm::vec3 emission;
+	unsigned int Refl;//Material Reflection Type
+	glm::vec3 minAABB;
 	unsigned* d_idx;
+	glm::vec3 maxAABB;
 
-	Object() {};
-	Object(unsigned c, glm::vec3 _minAABB, glm::vec3 _maxAABB) 
-	: color(c), minAABB(_minAABB), maxAABB(_maxAABB) {};
 };
 
-void initMesh(float*& d_vert, float*& d_normal, float*& d_uv, Object*& d_obj);
+struct MeshInfo {
+	float* d_v, * d_n, * d_uv;
+	Object* d_o;
+	int N;//Object Count;
+
+	void init(float* v, float* n, float* uv, Object* o, int _N) {
+		d_v = v, d_n = n, d_uv = uv, d_o = o;
+		N = _N;
+	};
+};
+
+
+
+MeshInfo initMesh();
 
