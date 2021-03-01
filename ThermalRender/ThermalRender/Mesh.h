@@ -1,6 +1,7 @@
 #pragma once
 #define GLM_FORCE_CUDA
 #include <glm/glm.hpp>
+#include <vector>
 
 struct Object {
 	glm::vec3 color;
@@ -15,16 +16,15 @@ struct Object {
 
 struct MeshInfo {
 	float* d_v, * d_n, * d_uv;
-	Object* d_o;
 	int N;//Object Count;
 
-	void init(float* v, float* n, float* uv, Object* o, int _N) {
-		d_v = v, d_n = n, d_uv = uv, d_o = o;
+	void init(float* v, float* n, float* uv, int _N) {
+		d_v = v, d_n = n, d_uv = uv;
 		N = _N;
 	};
 };
 
 
 
-MeshInfo initMesh();
+MeshInfo initMesh(std::vector<Object>& h_obj);
 

@@ -87,11 +87,13 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="ThermalData.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.cuh" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Render.cuh" />
+    <ClInclude Include="ThermalData.h" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Render.cu" />

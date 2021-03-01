@@ -9,10 +9,11 @@
 using namespace glm;
 
 __constant__ MeshInfo m;
+__constant__ Object objList[10];
 __constant__ int w, h, MAX_DEPTH = 6, d_Samples;
 __constant__ curandState_t* state;
 __constant__ Camera cam;
-__constant__ float EPSILON = 1e-3, float PI;
+__constant__ float EPSILON = 1e-4, float PI;
 
 __global__ void cuRand_Setup_Kernel(int seed) {
 	const int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
@@ -22,7 +23,9 @@ __global__ void cuRand_Setup_Kernel(int seed) {
 }
 
 void initRender(int width, int height) {
-	MeshInfo h_m = initMesh();
+	std::vector<Object> h_obj;
+	MeshInfo h_m = initMesh(h_obj);
+	gpuErrchk(cudaMemcpyToSymbol(objList, h_obj.data(), h_obj.size() * sizeof(Object)));
 	gpuErrchk(cudaMemcpyToSymbol(m, &h_m, sizeof(MeshInfo)));
 
 	gpuErrchk(cudaMemcpyToSymbol(w, &width, sizeof(unsigned)));
@@ -41,7 +44,7 @@ void initRender(int width, int height) {
 
 	//Setup Camera
 	Camera h_cam;
-	h_cam.init(vec3(-2.f, 3.f, 1.f), vec3(0.f, 0.f, -5.f), vec3(0.f, 1.0f, 0.f));
+	h_cam.init(vec3(-1.f, 2.f, 1.f), vec3(0.f, 0.f, -5.f), vec3(0.f, 1.0f, 0.f));
 	gpuErrchk(cudaMemcpyToSymbol(cam, &h_cam, sizeof(Camera)));
 
 	float h_pi = pi<float>();
@@ -108,7 +111,7 @@ __device__ vec3 trace(Ray ray, int depth, curandState_t& state) {
 	int A, B, C, i_obj = -1;
 	//Find the nearest triangle
 	for (int i = 0; i < m.N; i++) {
-		Object obj = m.d_o[i];
+		Object obj = objList[i];
 		if (ray.RayAABBIntersection(obj.minAABB, obj.maxAABB)) {
 			for (int j = 0; j < obj.N / 3; j++) {
 				unsigned int idx0 = obj.d_idx[3 * j], idx1 = obj.d_idx[3 * j + 1], idx2 = obj.d_idx[3 * j + 2];
@@ -126,7 +129,7 @@ __device__ vec3 trace(Ray ray, int depth, curandState_t& state) {
 
 	if (i_obj == -1) return vec3(0.75f);
 	//Fetch vertex position, normal and texture coordinates
-	const Object obj = m.d_o[i_obj];
+	const Object obj = objList[i_obj];
 	vec3 p, n; vec2 uv;
 	FetchMesh(n, uv, A, B, C, u, v);
 	p = ray.o + ray.d * t + EPSILON * n;
@@ -163,7 +166,8 @@ __global__ void RayTracingKernel(float* d_pbo) {
 	const int idx = x + y * w;
 	curandState_t localState = state[idx];//use register for local efficiency
 	
-	Ray ray(cam.pos, cam.UnProject(float(x) / float(w), float(y) / float(h)));
+	float u = float(x) + curand_uniform(&localState), v = float(y) + curand_uniform(&localState);//Anti-alising
+	Ray ray(cam.pos, cam.UnProject(u / float(w), v / float(h)));
 	vec3 c = trace(ray, 0, localState);
 	//c = pow(c, vec3(1.f / 2.2f));//Gamma Correction
 
