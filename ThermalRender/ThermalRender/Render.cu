@@ -6,10 +6,12 @@
 #include <time.h>
 #include "Camera.cuh"
 #include <glm/gtc/constants.hpp>
+#include "ThermalData.h"
 using namespace glm;
 
 __constant__ MeshInfo m;
 __constant__ Object objList[10];
+__constant__ Wave wave_sky, wave_zero;
 __constant__ int w, h, MAX_DEPTH = 6, d_Samples;
 __constant__ curandState_t* state;
 __constant__ Camera cam;
@@ -49,7 +51,11 @@ void initRender(int width, int height) {
 
 	float h_pi = pi<float>();
 	gpuErrchk(cudaMemcpyToSymbol(PI, &h_pi, sizeof(float)));
-	gpuErrchk(cudaDeviceSetLimit(cudaLimitStackSize, 1024 * 8))
+	gpuErrchk(cudaDeviceSetLimit(cudaLimitStackSize, 1024 * 8));
+
+	Wave h_zero = Wave::GetWave(0.f), h_sky = GetSky();
+	gpuErrchk(cudaMemcpyToSymbol(wave_zero, &h_zero, sizeof(Wave)));
+	gpuErrchk(cudaMemcpyToSymbol(wave_sky, &h_sky, sizeof(Wave)));
 }
 struct Ray {
 	vec3 o, d, invD;
@@ -105,8 +111,8 @@ __device__ void FetchMesh(vec3& n, vec2& uv, int A, int B, int C, float u, float
 }
 
 
-__device__ vec3 trace(Ray ray, int depth, curandState_t& state) {
-	if (depth > MAX_DEPTH) return vec3(EPSILON);
+__device__ Wave trace(Ray ray, int depth, curandState_t& state) {
+	if (depth > MAX_DEPTH) return wave_zero;
 	float u, v, t = 9999.f;
 	int A, B, C, i_obj = -1;
 	//Find the nearest triangle
@@ -127,24 +133,24 @@ __device__ vec3 trace(Ray ray, int depth, curandState_t& state) {
 		}
 	}
 
-	if (i_obj == -1) return vec3(0.75f);
+	if (i_obj == -1) return wave_sky;
 	//Fetch vertex position, normal and texture coordinates
 	const Object obj = objList[i_obj];
 	vec3 p, n; vec2 uv;
 	FetchMesh(n, uv, A, B, C, u, v);
 	p = ray.o + ray.d * t + EPSILON * n;
 
-	if (obj.Refl == 0)//Specular
+	if (obj.refl_type == 0)//Specular
 	{
 		vec3 r = reflect(ray.d, n);
-		return obj.emission + obj.color * trace(Ray(p, r), depth + 1, state);
+		return obj.emis + obj.refl * trace(Ray(p, r), depth + 1, state);
 	}
-	else if (obj.Refl == 1) //Diffuse;
+	else if (obj.refl_type == 1) //Diffuse;
 	{
 		vec3 a = normalize(abs(n.x) < 1 - EPSILON ? cross(vec3(1, 0, 0), n) : cross(vec3(0, 1, 0), n)), b = cross(a, n);
 		float alpha = 2.f * PI * curand_uniform(&state), beta = curand_uniform(&state);
 		vec3 newDir = (glm::cos(alpha ) * a + glm::sin(alpha) * b) * sqrt(1.f - beta * beta) + beta * n;
-		return obj.emission + obj.color * trace(Ray(p, newDir), depth + 1, state);
+		return obj.emis + obj.refl * trace(Ray(p, newDir), depth + 1, state);
 	}
 
 }
@@ -168,13 +174,12 @@ __global__ void RayTracingKernel(float* d_pbo) {
 	
 	float u = float(x) + curand_uniform(&localState), v = float(y) + curand_uniform(&localState);//Anti-alising
 	Ray ray(cam.pos, cam.UnProject(u / float(w), v / float(h)));
-	vec3 c = trace(ray, 0, localState);
-	//c = pow(c, vec3(1.f / 2.2f));//Gamma Correction
+	Wave curWave = trace(ray, 0, localState);
 
-	vec3 preColor;
-	memcpy(&preColor[0], d_pbo + 4 * idx, 3 * sizeof(float));
-	c = (preColor * float(d_Samples - 1) + c) / float(d_Samples);
-	memcpy(d_pbo + 4 * idx, &c[0], 3 * sizeof(float));
+	Wave preWave;
+	memcpy(&preWave[0], d_pbo + 11 * idx, 11 * sizeof(float));
+	curWave = (preWave * float(d_Samples - 1) + curWave) / float(d_Samples);
+	memcpy(d_pbo + 11 * idx, &curWave[0], 11 * sizeof(float));
 	state[idx] = localState;
 }
 

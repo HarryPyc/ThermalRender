@@ -1,12 +1,12 @@
 #include "ThermalData.h"
 
-const float Wave[] = {
+const float WaveLength[] = {
    7.8576538e+02, 8.1770000e+02, 8.6250000e+02, 9.1025000e+02,
    9.4255000e+02, 9.7750000e+02, 1.0277500e+03, 1.0780000e+03,
    1.1255000e+03, 1.1860000e+03, 1.2766667e+03
 };
 const float Emissivity[11][10] = {
-	//'human',       'marble',       'paint',        'glass',        'rubber',       'brass',        'road',         'al',           'al2o3',        'brick'          
+	//'human'0,       'marble'1,       'paint'2,       'glass'3,       'rubber'4,      'brass'5,        'road'6,        'al'7,         'al2o3'8,       'brick'9          
 	 9.9000000e-01,  9.5834758e-01,  8.7470001e-01,  5.0455443e-01,  9.2789246e-01,  1.2250251e-01,  9.6426578e-01,  5.5701898e-01,  4.1617280e-02,  9.7773773e-01,
 	 9.9000000e-01,  9.5462609e-01,  8.8365367e-01,  2.8523451e-01,  9.2827028e-01,  1.1789014e-01,  9.7194589e-01,  5.4616836e-01,  4.1602933e-02,  9.7348785e-01,
 	 9.9000000e-01,  9.5099592e-01,  9.6279529e-01,  3.8887318e-01,  9.2640468e-01,  1.2078545e-01,  9.6430868e-01,  5.2990503e-01,  4.0821044e-02,  9.6252597e-01,
@@ -29,24 +29,24 @@ const double c = 299792458, k = 138064852e-31, PI = 3.141592653589793238463,
 h = 2 * PI * 105457180e-42;
 
 float BBP(float T, int index) {
-	float v = Wave[index];
+	float v = WaveLength[index];
 	return 2e8 * (h * c * c * v * v * v) / (exp(100 * h * c * v / k / T) - 1);
 }
 
-void uploadThermalData(GLuint program, int index) {
-	glUseProgram(program);
-	const int n = 9;//total objects
-	const float wall_refl = 1 - Emissivity[index][9], floor_refl = 1 - Emissivity[index][6], light_refl = 1 - Emissivity[index][3],
-		sphere_refl = 1 - Emissivity[index][7], cone_refl = 1-Emissivity[index][4];
-	float Reflectivity[n] = {
-		wall_refl,wall_refl,wall_refl,wall_refl,wall_refl,floor_refl,
-		light_refl,sphere_refl,cone_refl
-	};
-	glUniform1fv(glGetUniformLocation(program, "Reflectivity"), n, Reflectivity);
-	float intensity[n];
-	for (int i = 0; i < n; i++) {
-		intensity[i] = BBP(Temprature[i]+273.15, index)*(1-Reflectivity[i]);
+
+void FetchThermalData(int mat, float temp, Object& obj)
+{
+	for (unsigned int wave = 0; wave < 11; wave++) {
+		obj.refl[wave] = 1 - Emissivity[wave][mat];
+		obj.emis[wave] = BBP(temp + 273.15f, wave) * Emissivity[wave][mat];
 	}
-	glUniform1fv(glGetUniformLocation(program, "Intensity"), n, intensity);
 }
 
+Wave GetSky()
+{
+	Wave sky;
+	for (int i = 0; i < 11; i++) {
+		sky[i] = BBP(273.15f, i) * Emissivity[i][0];
+	}
+	return sky;
+}
