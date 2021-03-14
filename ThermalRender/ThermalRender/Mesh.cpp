@@ -2,6 +2,7 @@
 #include <string>
 #include <ObjLoad.h>
 #include "Render.cuh"
+#include "ThermalData.h"
 
 MeshInfo initMesh(std::vector<Object>& h_obj) {
 	float* d_vert, * d_normal, * d_uv;
@@ -21,8 +22,8 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 	size_t uv_size = data.texCoord.size() * sizeof(float);
 	gpuErrchk(cudaMalloc((void**)&d_uv, uv_size));
 	gpuErrchk(cudaMemcpy(d_uv, data.texCoord.data(), uv_size, cudaMemcpyHostToDevice));
-	//Upload Index
-
+	
+	//Upload Index & Object info
 	for (auto object : data.faces) {
 		if (object.first == "default")
 			continue;
@@ -30,19 +31,16 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 		memcpy(&minAABB[0], &data.AABB[object.first][0], 3 * sizeof(float));
 		memcpy(&maxAABB[0], &data.AABB[object.first][3], 3 * sizeof(float));
 		Object obj;
-		if (object.first[0] == '6') {
-			obj.color = glm::vec3(0.75f, 0.25f, 0.25f);
-			obj.useTex = true;
-		}
-		else {
-			obj.color = glm::vec3(0.5f);
-			obj.useTex = false;
-		}
-		obj.emission = glm::vec3(0.f);
+
+		std::string name = object.first;
+		int mat = name[0] - '0';
+		float temp = (name[2] - '0') * 10.f + (name[3] - '0');
+		FetchThermalData(mat, temp, obj);
+
 		obj.minAABB = minAABB - 0.01f;
 		obj.maxAABB = maxAABB + 0.01f;
 		obj.N = object.second.size();
-		obj.Refl = 1;
+		obj.refl_type = 1;//Diffuse
 
 		size_t idx_size = object.second.size() * sizeof(unsigned int);
 		gpuErrchk(cudaMalloc((void**)&obj.d_idx, idx_size));
