@@ -11,7 +11,7 @@ struct Object {
 	glm::vec3 minAABB;
 	unsigned* d_idx;
 	glm::vec3 maxAABB;
-
+	bool useTex;
 };
 
 struct MeshInfo {
