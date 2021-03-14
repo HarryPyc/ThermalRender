@@ -31,6 +31,7 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 		memcpy(&minAABB[0], &data.AABB[object.first][0], 3 * sizeof(float));
 		memcpy(&maxAABB[0], &data.AABB[object.first][3], 3 * sizeof(float));
 		Object obj;
+
 		std::string name = object.first;
 		int mat = name[0] - '0';
 		float temp = (name[2] - '0') * 10.f + (name[3] - '0');

@@ -7,7 +7,14 @@
 #include "Camera.cuh"
 #include <glm/gtc/constants.hpp>
 #include "ThermalData.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
+
 using namespace glm;
+
+texture<float4, cudaTextureType2D, cudaReadModeElementType> emisMap, normalMap;
 
 __constant__ MeshInfo m;
 __constant__ Object objList[10];
@@ -22,6 +29,25 @@ __global__ void cuRand_Setup_Kernel(int seed) {
 	if (x >= w || y >= h) return;
 
 	curand_init(seed, x + y * w, 0, &state[x + y * w]);
+}
+
+void initTexture(textureReference& tex, const char* path) {
+	int w, h, comp;
+	float* h_image = stbi_loadf(path, &w, &h, &comp, 4);
+
+	cudaChannelFormatDesc format = cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
+	
+	cudaArray_t cuArray;
+	gpuErrchk(cudaMallocArray(&cuArray, &format, w, h));
+	gpuErrchk(cudaMemcpyToArray(cuArray, 0, 0, h_image, w * h * 4 * sizeof(float), cudaMemcpyHostToDevice));
+
+	tex.addressMode[0] = cudaAddressModeWrap;
+	tex.addressMode[1] = cudaAddressModeWrap;
+	tex.filterMode = cudaFilterModeLinear;
+	tex.normalized = true;
+
+	gpuErrchk(cudaBindTextureToArray(&tex, cuArray, &format));
+	delete[] h_image;
 }
 
 void initRender(int width, int height) {
@@ -52,6 +78,9 @@ void initRender(int width, int height) {
 	float h_pi = pi<float>();
 	gpuErrchk(cudaMemcpyToSymbol(PI, &h_pi, sizeof(float)));
 	gpuErrchk(cudaDeviceSetLimit(cudaLimitStackSize, 1024 * 8));
+
+
+	initTexture(normalMap, "asset/texture/cube_normal.jpg");
 
 	Wave h_zero = Wave::GetWave(0.f), h_sky = GetSky();
 	gpuErrchk(cudaMemcpyToSymbol(wave_zero, &h_zero, sizeof(Wave)));
@@ -104,10 +133,11 @@ __device__ void FetchMesh(vec3& n, vec2& uv, int A, int B, int C, float u, float
 	vec3 n0(m.d_n[3 * A], m.d_n[3 * A + 1], m.d_n[3 * A + 2]), n1(m.d_n[3 * B], m.d_n[3 * B + 1], m.d_n[3 * B + 2]),
 		n2(m.d_n[3 * C], m.d_n[3 * C + 1], m.d_n[3 * C + 2]);
 	vec2 uv0(m.d_uv[2 * A], m.d_uv[2 * A + 1]), uv1(m.d_uv[2 * B], m.d_uv[2 * B + 1]), uv2(m.d_uv[2 * C], m.d_uv[2 * C + 1]);
-	n = (1 - u - v) * n0 + u * n1 + v * n2;
+	n = (1.f - u - v) * n0 + u * n1 + v * n2;
 	n = normalize(n);
 
-	uv = (1 - u - v) * uv0 + u * uv1 + v * uv2;
+	uv = (1.f - u - v) * uv0 + u * uv1 + v * uv2;
+	uv.y = 1.0f - uv.y;
 }
 
 
@@ -125,7 +155,7 @@ __device__ Wave trace(Ray ray, int depth, curandState_t& state) {
 					v2(m.d_v[3 * idx2], m.d_v[3 * idx2 + 1], m.d_v[3 * idx2 + 2]);
 				float _t, _u, _v;
 				if (ray.RayTriangleIntersection(v0, v1, v2, _t, _u, _v) &&  _t < t) {
-					t = _t, u = _t, v = _v;
+					t = _t, u = _u, v = _v;
 					A = idx0, B = idx1, C = idx2;
 					i_obj = i;
 				}
@@ -138,6 +168,14 @@ __device__ Wave trace(Ray ray, int depth, curandState_t& state) {
 	const Object obj = objList[i_obj];
 	vec3 p, n; vec2 uv;
 	FetchMesh(n, uv, A, B, C, u, v);
+
+	vec3 color = obj.color;
+	if (obj.useTex) {
+		float4 n_sample = tex2D(normalMap, uv.x, uv.y);
+
+		memcpy(&n[0], &n_sample, 3 * sizeof(float));
+		n = normalize(n * 2.0f - 1.0f);
+	}
 	p = ray.o + ray.d * t + EPSILON * n;
 
 	if (obj.refl_type == 0)//Specular
@@ -150,21 +188,12 @@ __device__ Wave trace(Ray ray, int depth, curandState_t& state) {
 		vec3 a = normalize(abs(n.x) < 1 - EPSILON ? cross(vec3(1, 0, 0), n) : cross(vec3(0, 1, 0), n)), b = cross(a, n);
 		float alpha = 2.f * PI * curand_uniform(&state), beta = curand_uniform(&state);
 		vec3 newDir = (glm::cos(alpha ) * a + glm::sin(alpha) * b) * sqrt(1.f - beta * beta) + beta * n;
+
 		return obj.emis + obj.refl * trace(Ray(p, newDir), depth + 1, state);
 	}
 
 }
 
-__device__ inline unsigned int ConvVec4ToUint(glm::vec4 val) {
-	val *= 255.f;
-	return (unsigned int(val.w) & 0x000000FF) << 24U | (unsigned int(val.z) & 0x000000FF) << 16U
-		| (unsigned int(val.y) & 0x000000FF) << 8U | (unsigned int(val.x) & 0x000000FF);
-}
-__device__ inline glm::vec4 ConvUintToVec4(unsigned int val)
-{
-	glm::vec4 res(float((val & 0x000000FF)), float((val & 0x0000FF00) >> 8U), float((val & 0x00FF0000) >> 16U), float((val & 0xFF000000) >> 24U));
-	return res / 255.f;
-}
 
 __global__ void RayTracingKernel(float* d_pbo) {
 	const int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
