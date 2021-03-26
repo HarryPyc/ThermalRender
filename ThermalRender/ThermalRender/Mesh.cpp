@@ -8,7 +8,7 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 	float* d_vert, * d_normal, * d_uv;
 	MeshInfo info;
 
-	const std::string mesh_path = "asset/model/human_and_car.obj";
+	const std::string mesh_path = "asset/model/human_and_car01.obj";
 	obj::Model data = obj::loadModelFromFile(mesh_path);
 	//Upload Vertex
 	size_t vert_size = data.vertex.size() * sizeof(float);
@@ -36,6 +36,10 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 		int mat = name[0] - '0';
 		float temp = (name[2] - '0') * 10.f + (name[3] - '0');
 		FetchThermalData(mat, temp, obj);
+		if (mat == 6 || mat == 9)
+			obj.useTex = true;
+		else
+			obj.useTex = false;
 
 		obj.minAABB = minAABB - 0.01f;
 		obj.maxAABB = maxAABB + 0.01f;
@@ -48,7 +52,7 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 
 		h_obj.push_back(obj);
 	}
-	
+	h_obj[7].useTex = false;
 
 	info.init(d_vert, d_normal, d_uv, h_obj.size());
 	return info;

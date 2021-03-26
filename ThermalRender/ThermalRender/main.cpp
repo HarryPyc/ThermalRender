@@ -4,8 +4,8 @@
 #include <string>
 #include <fstream>
 
-const int WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720;
-const int TargetSample = 512;
+const int WINDOW_WIDTH = 640, WINDOW_HEIGHT = 480;
+const int TargetSample = 2048;
 
 int main() {
 	
@@ -31,13 +31,13 @@ int main() {
 				outFile << *(ptr + i);
 				outFile << " ";
 			}
-			outFile << "\t";
+			//outFile << "\t";
 		
 		}
 		outFile << "\n";
 	}
 	outFile.close();
 	gpuErrchk(cudaFree(d_data));
-	delete h_data;
+	delete[] h_data;
 	return 0;
 }

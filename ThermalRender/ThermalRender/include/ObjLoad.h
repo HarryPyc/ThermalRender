@@ -154,7 +154,7 @@ namespace obj {
                 line_in >> data.texCoord >> data.texCoord >> data.texCoord;
             else if (op == "vn")
                 line_in >> data.normal >> data.normal >> data.normal;
-            else if (op == "g") {
+            else if (op == "o") {
                 groups.clear();
                 while (line_in >> groups);
                 std::vector<float> aabb{ MAX, MAX, MAX, -MAX, -MAX, -MAX };
