@@ -30,8 +30,8 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 		memcpy(&minAABB[0], &data.AABB[object.first][0], 3 * sizeof(float));
 		memcpy(&maxAABB[0], &data.AABB[object.first][3], 3 * sizeof(float));
 		Object obj;
-		if (object.first[0] == '6') {
-			obj.color = glm::vec3(0.75f, 0.25f, 0.25f);
+		if (object.first[0] == '9' || object.first[0] == '6') {
+			obj.color = glm::vec3(0.5f);
 			obj.useTex = true;
 		}
 		else {

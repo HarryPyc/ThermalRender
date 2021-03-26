@@ -69,7 +69,7 @@ void initRender(int width, int height) {
 
 	//Setup Camera
 	Camera h_cam;
-	h_cam.init(vec3(-1.f, 2.f, 1.f), vec3(0.f, 0.f, -5.f), vec3(0.f, 1.0f, 0.f));
+	h_cam.init(vec3(-1.f, 1.f, 1.f), vec3(0.f, 0.f, -5.f), vec3(0.f, 1.0f, 0.f));
 	gpuErrchk(cudaMemcpyToSymbol(cam, &h_cam, sizeof(Camera)));
 
 	float h_pi = pi<float>();
@@ -165,11 +165,13 @@ __device__ vec3 trace(Ray ray, int depth, curandState_t& state) {
 	vec3 color = obj.color;
 	if (obj.useTex) {
 		float4 n_sample = tex2D(normalMap, uv.x, uv.y);
-		float4 c_sample = tex2D(emisMap, uv.x, uv.y);
-
-		memcpy(&n[0], &n_sample, 3 * sizeof(float));
-		memcpy(&color[0], &c_sample, 3 * sizeof(float));
-		n = normalize(n * 2.0f - 1.0f);
+		//float4 c_sample = tex2D(emisMap, uv.x, uv.y);
+		vec3 nt;
+		memcpy(&nt[0], &n_sample, 3 * sizeof(float));
+		//memcpy(&color[0], &c_sample, 3 * sizeof(float));
+		nt = normalize(nt * 2.0f - 1.0f);
+		vec3 T = normalize(cross(n, vec3(1))), B = cross(T, n);
+		n = mat3(T, B, n) * nt;
 	}
 	p = ray.o + ray.d * t + EPSILON * n;
 
