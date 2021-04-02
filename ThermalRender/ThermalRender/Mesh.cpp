@@ -2,7 +2,6 @@
 #include <string>
 #include <ObjLoad.h>
 #include "Render.cuh"
-#include "ThermalData.h"
 
 MeshInfo initMesh(std::vector<Object>& h_obj) {
 	float* d_vert, * d_normal, * d_uv;
@@ -22,8 +21,8 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 	size_t uv_size = data.texCoord.size() * sizeof(float);
 	gpuErrchk(cudaMalloc((void**)&d_uv, uv_size));
 	gpuErrchk(cudaMemcpy(d_uv, data.texCoord.data(), uv_size, cudaMemcpyHostToDevice));
-	
-	//Upload Index & Object info
+	//Upload Index
+
 	for (auto object : data.faces) {
 		if (object.first == "default")
 			continue;
@@ -40,11 +39,11 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 			obj.useTex = true;
 		else
 			obj.useTex = false;
-
+    
 		obj.minAABB = minAABB - 0.01f;
 		obj.maxAABB = maxAABB + 0.01f;
 		obj.N = object.second.size();
-		obj.refl_type = 1;//Diffuse
+		obj.Refl = 1;
 
 		size_t idx_size = object.second.size() * sizeof(unsigned int);
 		gpuErrchk(cudaMalloc((void**)&obj.d_idx, idx_size));

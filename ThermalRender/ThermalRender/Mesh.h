@@ -2,53 +2,12 @@
 #define GLM_FORCE_CUDA
 #include <glm/glm.hpp>
 #include <vector>
-#include <cuda.h>
-#include <cuda_runtime.h>
 
-struct Wave {
-	float w[11];
-	__host__ __device__ inline Wave operator*(const Wave& other) const{
-		Wave res;
-		for (int i = 0; i < 11; i++) {
-			res[i] = w[i] * other.w[i];
-		}
-		return res;
-	}
-	__host__ __device__ inline Wave operator*(const float& f) const {
-		Wave res;
-		for (int i = 0; i < 11; i++) {
-			res[i] = w[i] * f;
-		}
-		return res;
-	}
-	__host__ __device__ inline Wave operator/(const float& f) const {
-		Wave res;
-		for (int i = 0; i < 11; i++) {
-			res[i] = w[i] / f;
-		}
-		return res;
-	}
-	__host__ __device__ inline Wave operator+(const Wave& other) const{
-		Wave res;
-		for (int i = 0; i < 11; i++) {
-			res[i] = w[i] + other.w[i];
-		}
-		return res;
-	}
-	__host__ __device__ inline float& operator[](const unsigned& i) {
-		return w[i];
-	}
-	__host__ __device__ static Wave GetWave(const float& val) {
-		Wave w;
-		memset(&w[0], val, 11 * sizeof(float));
-		return w;
-	}
-};
 struct Object {
 	glm::vec3 color;
 	unsigned int N;//index count
-	Wave emis, refl;
-	unsigned int refl_type;//Material Reflection Type
+	glm::vec3 emission;
+	unsigned int Refl;//Material Reflection Type
 	glm::vec3 minAABB;
 	unsigned* d_idx;
 	glm::vec3 maxAABB;

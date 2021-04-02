@@ -1,23 +1,15 @@
-
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 #include <iostream>
+#include "cuda_gl_interop.h"
 #include "Render.cuh"
-#include <string>
-#include <fstream>
 
 const int WINDOW_WIDTH = 640, WINDOW_HEIGHT = 480;
 const int TargetSample = 2048;
 
 int main() {
-	
+	initOpenGL();
 	initRender(WINDOW_WIDTH, WINDOW_HEIGHT);
-	int Samples = 0;
-	float* d_data, *h_data;
-	size_t data_size = 11 * WINDOW_WIDTH * WINDOW_HEIGHT;
-	gpuErrchk(cudaMalloc((void**)&d_data, data_size * sizeof(float)));
-	while (Samples < TargetSample) {
-		render(d_data, WINDOW_WIDTH, WINDOW_HEIGHT, Samples);
-		printf("Sample: %i\n", Samples);
-	}
 
 	h_data = new float[11 * WINDOW_WIDTH * WINDOW_HEIGHT];
 	gpuErrchk(cudaMemcpy(&h_data[0], &d_data[0], data_size * sizeof(float), cudaMemcpyDeviceToHost));
@@ -39,5 +31,6 @@ int main() {
 	outFile.close();
 	gpuErrchk(cudaFree(d_data));
 	delete[] h_data;
+
 	return 0;
 }
