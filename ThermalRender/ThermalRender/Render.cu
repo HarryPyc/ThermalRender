@@ -16,7 +16,8 @@ texture<float4, cudaTextureType2D, cudaReadModeElementType> emisMap, normalMap;
 
 __constant__ MeshInfo m;
 __constant__ Object objList[10];
-__constant__ int w, h, MAX_DEPTH = 6, d_Samples;
+__constant__ Wave wave_sky, wave_zero;
+__constant__ int w, h, MAX_DEPTH = 1, d_Samples;
 __constant__ curandState_t* state;
 __constant__ Camera cam;
 __constant__ float EPSILON = 1e-4, float PI;
@@ -178,13 +179,13 @@ __device__ vec3 trace(Ray ray, int depth, curandState_t& state) {
 		}
 	}
 
-	if (i_obj == -1) return vec3(0.75f);
+	if (i_obj == -1) return wave_zero;
+
 	//Fetch vertex position, normal and texture coordinates
 	const Object obj = objList[i_obj];
 	vec3 p, n; vec2 uv;
 	FetchMesh(n, uv, A, B, C, u, v);
 
-	vec3 color = obj.color;
 	if (obj.useTex) {
 		float4 n_sample = tex2D(normalMap, uv.x, uv.y);
 		//float4 c_sample = tex2D(emisMap, uv.x, uv.y);
@@ -206,7 +207,11 @@ __device__ vec3 trace(Ray ray, int depth, curandState_t& state) {
 		vec3 a = normalize(abs(n.x) < 1 - EPSILON ? cross(vec3(1, 0, 0), n) : cross(vec3(0, 1, 0), n)), b = cross(a, n);
 		float alpha = 2.f * PI * curand_uniform(&state), beta = curand_uniform(&state);
 		vec3 newDir = (glm::cos(alpha ) * a + glm::sin(alpha) * b) * sqrt(1.f - beta * beta) + beta * n;
-		return obj.emission + color * trace(Ray(p, newDir), depth + 1, state);
+
+		//if (depth == 0)
+		//	return obj.refl * trace(Ray(p, newDir), depth + 1, state); //only reflection
+		return obj.emis + obj.refl * trace(Ray(p, newDir), depth + 1, state);
+
 	}
 
 }
