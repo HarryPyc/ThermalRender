@@ -2,12 +2,13 @@
 #include <string>
 #include <ObjLoad.h>
 #include "Render.cuh"
+#include "ThermalData.h"
 
 MeshInfo initMesh(std::vector<Object>& h_obj) {
 	float* d_vert, * d_normal, * d_uv;
 	MeshInfo info;
 
-	const std::string mesh_path = "asset/model/human_and_car.obj";
+	const std::string mesh_path = "asset/model/human_and_car01.obj";
 	obj::Model data = obj::loadModelFromFile(mesh_path);
 	//Upload Vertex
 	size_t vert_size = data.vertex.size() * sizeof(float);
@@ -21,8 +22,8 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 	size_t uv_size = data.texCoord.size() * sizeof(float);
 	gpuErrchk(cudaMalloc((void**)&d_uv, uv_size));
 	gpuErrchk(cudaMemcpy(d_uv, data.texCoord.data(), uv_size, cudaMemcpyHostToDevice));
-	//Upload Index
-
+	
+	//Upload Index & Object info
 	for (auto object : data.faces) {
 		if (object.first == "default")
 			continue;
@@ -30,19 +31,20 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 		memcpy(&minAABB[0], &data.AABB[object.first][0], 3 * sizeof(float));
 		memcpy(&maxAABB[0], &data.AABB[object.first][3], 3 * sizeof(float));
 		Object obj;
-		if (object.first[0] == '9' || object.first[0] == '6') {
-			obj.color = glm::vec3(0.5f);
+
+		std::string name = object.first;
+		int mat = name[0] - '0';
+		float temp = (name[2] - '0') * 10.f + (name[3] - '0');
+		FetchThermalData(mat, temp, obj);
+		if (mat == 6 || mat == 9)
 			obj.useTex = true;
-		}
-		else {
-			obj.color = glm::vec3(0.5f);
+		else
 			obj.useTex = false;
-		}
-		obj.emission = glm::vec3(0.f);
+
 		obj.minAABB = minAABB - 0.01f;
 		obj.maxAABB = maxAABB + 0.01f;
 		obj.N = object.second.size();
-		obj.Refl = 1;
+		obj.refl_type = 1;//Diffuse
 
 		size_t idx_size = object.second.size() * sizeof(unsigned int);
 		gpuErrchk(cudaMalloc((void**)&obj.d_idx, idx_size));
@@ -50,7 +52,7 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 
 		h_obj.push_back(obj);
 	}
-	
+	h_obj[7].useTex = false;
 
 	info.init(d_vert, d_normal, d_uv, h_obj.size());
 	return info;
