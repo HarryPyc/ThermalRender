@@ -70,7 +70,7 @@ void initRender(int width, int height) {
 
 	//Setup Camera
 	Camera h_cam;
-	h_cam.init(vec3(-1.f, 1.f, 1.f), vec3(0.f, 0.f, -5.f), vec3(0.f, 1.0f, 0.f));
+	h_cam.init(vec3(0.1f, 1.f, 1.f), vec3(0.1f, 0.f, -5.f), vec3(0.f, 1.0f, 0.f));
 	gpuErrchk(cudaMemcpyToSymbol(cam, &h_cam, sizeof(Camera)));
 
 	float h_pi = pi<float>();
