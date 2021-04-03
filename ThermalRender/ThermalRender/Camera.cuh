@@ -7,9 +7,10 @@
 
 class Camera {
 public:
-	glm::vec3 pos;
+	glm::vec3 pos, dir;
 	__host__ void init(glm::vec3 position, glm::vec3 target, glm::vec3 up) {
 		pos = position;
+		dir = glm::normalize(target - position);
 		P = glm::perspective(glm::radians(60.f), 4.f / 3.f, 0.01f, 100.f);
 		V = glm::lookAt(pos, target, up);
 		invPV = glm::inverse(P * V);

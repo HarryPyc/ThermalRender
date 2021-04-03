@@ -30,6 +30,7 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 		glm::vec3 minAABB, maxAABB;
 		memcpy(&minAABB[0], &data.AABB[object.first][0], 3 * sizeof(float));
 		memcpy(&maxAABB[0], &data.AABB[object.first][3], 3 * sizeof(float));
+
 		Object obj;
 
 		std::string name = object.first;
@@ -41,8 +42,8 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 		else
 			obj.useTex = false;
 
-		obj.minAABB = minAABB - 0.01f;
-		obj.maxAABB = maxAABB + 0.01f;
+		obj.minAABB = minAABB - 0.1f;
+		obj.maxAABB = maxAABB + 0.1f;
 		obj.N = object.second.size();
 		obj.refl_type = 1;//Diffuse
 

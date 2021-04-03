@@ -72,7 +72,7 @@ void initRender(int width, int height) {
 
 	//Setup Camera
 	Camera h_cam;
-	h_cam.init(vec3(-1.f, 1.f, 1.f), vec3(0.f, 0.f, -5.f), vec3(0.f, 1.0f, 0.f));
+	h_cam.init(vec3(0.f, 1.f, 1.f), vec3(0.f, 1.f, -5.f), vec3(0.f, 1.0f, 0.f));
 	gpuErrchk(cudaMemcpyToSymbol(cam, &h_cam, sizeof(Camera)));
 
 	float h_pi = pi<float>();
@@ -80,7 +80,7 @@ void initRender(int width, int height) {
 	gpuErrchk(cudaDeviceSetLimit(cudaLimitStackSize, 1024 * 8));
 
 
-	initTexture(normalMap, "asset/texture/cube_normal.jpg");
+	initTexture(normalMap, "asset/texture/NormalMap.jpg");
 
 	Wave h_zero = Wave::GetWave(0.f), h_sky = GetSky();
 	gpuErrchk(cudaMemcpyToSymbol(wave_zero, &h_zero, sizeof(Wave)));
@@ -140,9 +140,30 @@ __device__ void FetchMesh(vec3& n, vec2& uv, int A, int B, int C, float u, float
 	uv.y = 1.0f - uv.y;
 }
 
+__device__ mat3 TBN(int A, int B, int C) {
+	vec3 v0(m.d_v[3 * A], m.d_v[3 * A + 1], m.d_v[3 * A + 2]), v1(m.d_v[3 * B], m.d_v[3 * B + 1], m.d_v[3 * B + 2]),
+		v2(m.d_v[3 * C], m.d_v[3 * C + 1], m.d_v[3 * C + 2]);
+	vec2 uv0(m.d_uv[2 * A], m.d_uv[2 * A + 1]), uv1(m.d_uv[2 * B], m.d_uv[2 * B + 1]), uv2(m.d_uv[2 * C], m.d_uv[2 * C + 1]);
+	vec3 e0 = v1 - v0, e1 = v2 - v0;
+	vec2 deltaUV0 = uv1 - uv0, deltaUV1 = uv2 - uv0;
 
-__device__ Wave trace(Ray ray, int depth, curandState_t& state) {
-	if (depth > MAX_DEPTH) return wave_zero;
+	vec3 t, b, n = normalize(cross(e0, e1));
+	float f = 1.0f / (deltaUV0.x * deltaUV1.y - deltaUV1.x * deltaUV0.y);
+
+	t.x = f * (deltaUV1.y * e0.x - deltaUV0.y * e1.x);
+	t.y = f * (deltaUV1.y * e0.y - deltaUV0.y * e1.y);
+	t.z = f * (deltaUV1.y * e0.z - deltaUV0.y * e1.z);
+
+	b.x = f * (-deltaUV1.x * e0.x + deltaUV0.x * e1.x);
+	b.y = f * (-deltaUV1.x * e0.y + deltaUV0.x * e1.y);
+	b.z = f * (-deltaUV1.x * e0.z + deltaUV0.x * e1.z);
+
+	t = normalize(t);
+	b = normalize(b);
+	return mat3(t, b, n);
+}
+
+__device__ vec3 trace(Ray ray, int depth, curandState_t& state) {
 	float u, v, t = 9999.f;
 	int A, B, C, i_obj = -1;
 	//Find the nearest triangle
@@ -163,7 +184,7 @@ __device__ Wave trace(Ray ray, int depth, curandState_t& state) {
 		}
 	}
 
-	if (i_obj == -1) return wave_zero;
+	if (i_obj == -1) return ray.o + t * ray.d;
 	//Fetch vertex position, normal and texture coordinates
 	const Object obj = objList[i_obj];
 	vec3 p, n; vec2 uv;
@@ -176,26 +197,10 @@ __device__ Wave trace(Ray ray, int depth, curandState_t& state) {
 		memcpy(&nt[0], &n_sample, 3 * sizeof(float));
 		//memcpy(&color[0], &c_sample, 3 * sizeof(float));
 		nt = normalize(nt * 2.0f - 1.0f);
-		vec3 T = vec3(1,0,0), B = cross(T, n);
-		n = mat3(T, B, n) * nt;
+		n = TBN(A, B, C) * nt;
 	}
 	p = ray.o + ray.d * t + EPSILON * n;
-
-	if (obj.refl_type == 0)//Specular
-	{
-		vec3 r = reflect(ray.d, n);
-		return obj.emis + obj.refl * trace(Ray(p, r), depth + 1, state);
-	}
-	else if (obj.refl_type == 1) //Diffuse;
-	{
-		vec3 a = normalize(abs(n.x) < 1 - EPSILON ? cross(vec3(1, 0, 0), n) : cross(vec3(0, 1, 0), n)), b = cross(a, n);
-		float alpha = 2.f * PI * curand_uniform(&state), beta = curand_uniform(&state);
-		vec3 newDir = (glm::cos(alpha ) * a + glm::sin(alpha) * b) * sqrt(1.f - beta * beta) + beta * n;
-		//if (depth == 0)
-		//	return obj.refl * trace(Ray(p, newDir), depth + 1, state); //only reflection
-		return obj.emis + obj.refl * trace(Ray(p, newDir), depth + 1, state);
-	}
-
+	return p;
 }
 
 
@@ -207,12 +212,11 @@ __global__ void RayTracingKernel(float* d_pbo) {
 	
 	float u = float(x) + curand_uniform(&localState), v = float(y) + curand_uniform(&localState);//Anti-alising
 	Ray ray(cam.pos, cam.UnProject(u / float(w), v / float(h)));
-	Wave curWave = trace(ray, 0, localState);
-
-	Wave preWave;
-	memcpy(&preWave[0], d_pbo + 11 * idx, 11 * sizeof(float));
-	curWave = (preWave * float(d_Samples - 1) + curWave) / float(d_Samples);
-	memcpy(d_pbo + 11 * idx, &curWave[0], 11 * sizeof(float));
+	vec3 hit = trace(ray, 0, localState);
+	float curDepth = dot(hit - cam.pos, cam.dir);
+	float preDepth = d_pbo[idx];
+	curDepth = (preDepth * float(d_Samples - 1) + curDepth) / float(d_Samples);
+	d_pbo[idx] = curDepth;
 	state[idx] = localState;
 }
 
