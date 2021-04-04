@@ -18,7 +18,8 @@ texture<float4, cudaTextureType2D, cudaReadModeElementType> emisMap, normalMap;
 
 __constant__ MeshInfo m;
 __constant__ Object objList[10];
-__constant__ int w, h, MAX_DEPTH = 6, d_Samples;
+__constant__ int w, h, MAX_DEPTH = 1, d_Samples;
+__constant__ Wave wave_zero, wave_sky;
 __constant__ curandState_t* state;
 __constant__ Camera cam;
 __constant__ float EPSILON = 1e-4, float PI;
@@ -71,7 +72,7 @@ void initRender(int width, int height) {
 
 	//Setup Camera
 	Camera h_cam;
-	h_cam.init(vec3(0.1f, 1.f, 1.f), vec3(0.1f, 0.f, -5.f), vec3(0.f, 1.0f, 0.f));
+	h_cam.init(vec3(-0.1f, 1.f, 1.f), vec3(-0.1f, 0.f, -5.f), vec3(0.f, 1.0f, 0.f));
 	gpuErrchk(cudaMemcpyToSymbol(cam, &h_cam, sizeof(Camera)));
 
 	float h_pi = pi<float>();
@@ -79,7 +80,7 @@ void initRender(int width, int height) {
 	gpuErrchk(cudaDeviceSetLimit(cudaLimitStackSize, 1024 * 8));
 
 
-	initTexture(normalMap, "asset/texture/cube_normal.jpg");
+	initTexture(normalMap, "asset/texture/NormalMap.jpg");
 
 	Wave h_zero = Wave::GetWave(0.f), h_sky = GetSky();
 	gpuErrchk(cudaMemcpyToSymbol(wave_zero, &h_zero, sizeof(Wave)));
@@ -139,6 +140,28 @@ __device__ void FetchMesh(vec3& n, vec2& uv, int A, int B, int C, float u, float
 	uv.y = 1.0f - uv.y;
 }
 
+__device__ mat3 TBN(int A, int B, int C) {
+	vec3 v0(m.d_v[3 * A], m.d_v[3 * A + 1], m.d_v[3 * A + 2]), v1(m.d_v[3 * B], m.d_v[3 * B + 1], m.d_v[3 * B + 2]),
+		v2(m.d_v[3 * C], m.d_v[3 * C + 1], m.d_v[3 * C + 2]);
+	vec2 uv0(m.d_uv[2 * A], m.d_uv[2 * A + 1]), uv1(m.d_uv[2 * B], m.d_uv[2 * B + 1]), uv2(m.d_uv[2 * C], m.d_uv[2 * C + 1]);
+	vec3 e0 = v1 - v0, e1 = v2 - v0;
+	vec2 deltaUV0 = uv1 - uv0, deltaUV1 = uv2 - uv0;
+
+	vec3 t, b, n = normalize(cross(e0, e1));
+	float f = 1.0f / (deltaUV0.x * deltaUV1.y - deltaUV1.x * deltaUV0.y);
+
+	t.x = f * (deltaUV1.y * e0.x - deltaUV0.y * e1.x);
+	t.y = f * (deltaUV1.y * e0.y - deltaUV0.y * e1.y);
+	t.z = f * (deltaUV1.y * e0.z - deltaUV0.y * e1.z);
+
+	b.x = f * (-deltaUV1.x * e0.x + deltaUV0.x * e1.x);
+	b.y = f * (-deltaUV1.x * e0.y + deltaUV0.x * e1.y);
+	b.z = f * (-deltaUV1.x * e0.z + deltaUV0.x * e1.z);
+
+	t = normalize(t);
+	b = normalize(b);
+	return mat3(t, b, n);
+}
 
 __device__ Wave trace(Ray ray, int depth, curandState_t& state) {
 	if (depth > MAX_DEPTH) return wave_zero;
@@ -176,8 +199,7 @@ __device__ Wave trace(Ray ray, int depth, curandState_t& state) {
 		memcpy(&nt[0], &n_sample, 3 * sizeof(float));
 		//memcpy(&color[0], &c_sample, 3 * sizeof(float));
 		nt = normalize(nt * 2.0f - 1.0f);
-		vec3 T = vec3(1,0,0), B = cross(T, n);
-		n = mat3(T, B, n) * nt;
+		n = TBN(A, B, C) * nt;
 	}
 	p = ray.o + ray.d * t + EPSILON * n;
 
@@ -210,9 +232,9 @@ __global__ void RayTracingKernel(float* d_pbo) {
 	Wave curWave = trace(ray, 0, localState);
 
 	Wave preWave;
-	memcpy(&preWave[0], d_pbo + 11 * idx, 11 * sizeof(float));
+	memcpy(&preWave[0], d_pbo + TOTAL_WAVE * idx, TOTAL_WAVE * sizeof(float));
 	curWave = (preWave * float(d_Samples - 1) + curWave) / float(d_Samples);
-	memcpy(d_pbo + 11 * idx, &curWave[0], 11 * sizeof(float));
+	memcpy(d_pbo + TOTAL_WAVE * idx, &curWave[0], TOTAL_WAVE * sizeof(float));
 	state[idx] = localState;
 }
 

@@ -36,7 +36,7 @@ float BBP(float T, int index) {
 
 void FetchThermalData(int mat, float temp, Object& obj)
 {
-	for (unsigned int wave = 0; wave < 11; wave++) {
+	for (unsigned int wave = 0; wave < TOTAL_WAVE; wave++) {
 		obj.refl[wave] = 1 - Emissivity[wave][mat];
 		obj.emis[wave] = BBP(temp + 273.15f, wave) * Emissivity[wave][mat];
 	}

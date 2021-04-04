@@ -4,33 +4,34 @@
 #include <vector>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#define TOTAL_WAVE 1
 
 struct Wave {
-	float w[11];
+	float w[TOTAL_WAVE];
 	__host__ __device__ inline Wave operator*(const Wave& other) const{
 		Wave res;
-		for (int i = 0; i < 11; i++) {
+		for (int i = 0; i < TOTAL_WAVE; i++) {
 			res[i] = w[i] * other.w[i];
 		}
 		return res;
 	}
 	__host__ __device__ inline Wave operator*(const float& f) const {
 		Wave res;
-		for (int i = 0; i < 11; i++) {
+		for (int i = 0; i < TOTAL_WAVE; i++) {
 			res[i] = w[i] * f;
 		}
 		return res;
 	}
 	__host__ __device__ inline Wave operator/(const float& f) const {
 		Wave res;
-		for (int i = 0; i < 11; i++) {
+		for (int i = 0; i < TOTAL_WAVE; i++) {
 			res[i] = w[i] / f;
 		}
 		return res;
 	}
 	__host__ __device__ inline Wave operator+(const Wave& other) const{
 		Wave res;
-		for (int i = 0; i < 11; i++) {
+		for (int i = 0; i < TOTAL_WAVE; i++) {
 			res[i] = w[i] + other.w[i];
 		}
 		return res;
@@ -40,7 +41,7 @@ struct Wave {
 	}
 	__host__ __device__ static Wave GetWave(const float& val) {
 		Wave w;
-		memset(&w[0], val, 11 * sizeof(float));
+		memset(&w[0], val, TOTAL_WAVE * sizeof(float));
 		return w;
 	}
 };
