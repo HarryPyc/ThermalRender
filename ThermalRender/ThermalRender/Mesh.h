@@ -4,7 +4,7 @@
 #include <vector>
 #include <cuda.h>
 #include <cuda_runtime.h>
-#define TOTAL_WAVE 1
+#define TOTAL_WAVE 11
 
 struct Wave {
 	float w[TOTAL_WAVE];

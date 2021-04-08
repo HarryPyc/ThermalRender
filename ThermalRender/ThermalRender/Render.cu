@@ -213,8 +213,7 @@ __device__ Wave trace(Ray ray, int depth, curandState_t& state) {
 		vec3 a = normalize(abs(n.x) < 1 - EPSILON ? cross(vec3(1, 0, 0), n) : cross(vec3(0, 1, 0), n)), b = cross(a, n);
 		float alpha = 2.f * PI * curand_uniform(&state), beta = curand_uniform(&state);
 		vec3 newDir = (glm::cos(alpha ) * a + glm::sin(alpha) * b) * sqrt(1.f - beta * beta) + beta * n;
-		//if (depth == 0)
-		//	return obj.refl * trace(Ray(p, newDir), depth + 1, state); //only reflection
+		//if (depth == 0) return obj.refl * trace(Ray(p, newDir), depth + 1, state); //only reflection
 		return obj.emis + obj.refl * trace(Ray(p, newDir), depth + 1, state);
 	}
 
