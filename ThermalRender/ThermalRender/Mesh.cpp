@@ -8,7 +8,7 @@ MeshInfo initMesh(std::vector<Object>& h_obj) {
 	float* d_vert, * d_normal, * d_uv;
 	MeshInfo info;
 
-	const std::string mesh_path = "asset/model/human_and_car01.obj";
+	const std::string mesh_path = "asset/model/human_and_car.obj";
 	obj::Model data = obj::loadModelFromFile(mesh_path);
 	//Upload Vertex
 	size_t vert_size = data.vertex.size() * sizeof(float);
